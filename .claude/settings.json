@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(fvm --version)",
+      "Bash(fvm releases *)",
+      "Bash(fvm use *)"
+    ]
+  }
+}
