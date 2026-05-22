@@ -1,0 +1,282 @@
+import asyncio
+import json
+import logging
+import os
+from pathlib import Path
+from typing import Any
+
+import google.generativeai as genai
+from dotenv import load_dotenv
+from google.generativeai.types import GenerationConfig
+from pydantic import ValidationError
+
+from app.schemas import CONDITION_VALUES, VERDICT_VALUES, ScanResult
+
+logger = logging.getLogger(__name__)
+
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+SCAN_RESULT_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "verdict": {
+            "type": "string",
+            "enum": list(VERDICT_VALUES),
+        },
+        "condition": {
+            "type": "string",
+            "enum": list(CONDITION_VALUES),
+            "nullable": True,
+        },
+        "action": {
+            "type": "string",
+        },
+        "reason": {
+            "type": "string",
+        },
+    },
+    "required": ["verdict", "condition", "action", "reason"],
+}
+
+PROMPT = """
+당신은 한국 분리배출 전문가입니다.
+이미지 속 물체의 재질, 오염 상태, 라벨/테이프 부착 여부, 복합 재질 여부를 판단하세요.
+
+반드시 JSON 객체 하나만 응답하세요. 마크다운 코드블록이나 설명 문장은 넣지 마세요.
+응답 필드는 verdict, condition, action, reason 네 개를 모두 포함해야 합니다.
+
+verdict는 반드시 다음 중 하나여야 합니다:
+일반쓰레기, 플라스틱, 종이류, 유리, 캔, 비닐, 스티로폼, 음식물, 특수폐기물
+
+condition은 반드시 다음 중 하나이거나 null이어야 합니다:
+세척 필요, 라벨·테이프 제거 필요, 부품 분리 필요, null
+
+응답 형식:
+{
+  "verdict": "플라스틱",
+  "condition": "세척 필요",
+  "action": "물로 3회 헹군 뒤 라벨을 제거하고 플라스틱 수거함에 배출하세요.",
+  "reason": "PP 재질 용기로 보이며 표면에 기름 오염이 확인됩니다."
+}
+""".strip()
+
+
+class GeminiError(Exception):
+    """Base exception for Gemini integration failures."""
+
+
+class GeminiConfigurationError(GeminiError):
+    """Raised when Gemini credentials are missing or invalid locally."""
+
+
+class GeminiResponseError(GeminiError):
+    """Raised when Gemini returns an unusable response."""
+
+
+def _load_env() -> None:
+    load_dotenv(BACKEND_DIR / ".env")
+
+
+def _load_api_key() -> str:
+    _load_env()
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise GeminiConfigurationError("GEMINI_API_KEY is not configured.")
+    return api_key
+
+
+def _configured_model_name() -> str:
+    _load_env()
+    model_name = os.getenv("GEMINI_MODEL")
+    if not model_name or not model_name.strip():
+        raise GeminiConfigurationError("GEMINI_MODEL is not configured.")
+    return model_name.strip()
+
+
+def _build_model(model_name: str) -> genai.GenerativeModel:
+    genai.configure(api_key=_load_api_key())
+    return genai.GenerativeModel(model_name)
+
+
+def _extract_json(text: str) -> dict[str, Any]:
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            raise
+        return json.loads(text[start : end + 1])
+
+
+def _normalize_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(payload)
+
+    if "verdict" in normalized:
+        normalized["verdict"] = _normalize_verdict(normalized["verdict"])
+
+    if "condition" in normalized:
+        normalized["condition"] = _normalize_condition(normalized["condition"])
+
+    if "action" in normalized and isinstance(normalized["action"], str):
+        normalized["action"] = normalized["action"].strip()
+
+    if "reason" in normalized and isinstance(normalized["reason"], str):
+        normalized["reason"] = normalized["reason"].strip()
+
+    return normalized
+
+
+def _normalize_verdict(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+
+    normalized = _compact_text(value)
+    aliases = {
+        "일반쓰레기": "일반쓰레기",
+        "일반폐기물": "일반쓰레기",
+        "종량제": "일반쓰레기",
+        "플라스틱": "플라스틱",
+        "페트": "플라스틱",
+        "페트병": "플라스틱",
+        "종이": "종이류",
+        "종이류": "종이류",
+        "종이팩": "종이류",
+        "유리": "유리",
+        "유리류": "유리",
+        "유리병": "유리",
+        "캔": "캔",
+        "캔류": "캔",
+        "금속캔": "캔",
+        "알루미늄캔": "캔",
+        "비닐": "비닐",
+        "비닐류": "비닐",
+        "스티로폼": "스티로폼",
+        "스티로폼류": "스티로폼",
+        "음식물": "음식물",
+        "음식물쓰레기": "음식물",
+        "특수폐기물": "특수폐기물",
+        "특수쓰레기": "특수폐기물",
+    }
+    return aliases.get(normalized, value.strip())
+
+
+def _normalize_condition(value: Any) -> Any:
+    if isinstance(value, list):
+        value = next((item for item in value if item), None)
+
+    if value is None:
+        return None
+
+    if not isinstance(value, str):
+        return value
+
+    normalized = _compact_text(value)
+    if normalized in {"", "null", "none", "없음", "조건없음", "해당없음", "불필요"}:
+        return None
+
+    if "세척" in normalized or "헹굼" in normalized or "오염제거" in normalized:
+        return "세척 필요"
+
+    if "라벨" in normalized or "테이프" in normalized or "스티커" in normalized:
+        return "라벨·테이프 제거 필요"
+
+    if "분리" in normalized or "분해" in normalized or "부품" in normalized:
+        return "부품 분리 필요"
+
+    return value.strip()
+
+
+def _compact_text(value: str) -> str:
+    return (
+        value.strip()
+        .lower()
+        .replace(" ", "")
+        .replace("·", "")
+        .replace("/", "")
+        .replace("-", "")
+        .replace("_", "")
+    )
+
+
+def _validate_scan_result(payload: dict[str, Any]) -> ScanResult:
+    if not isinstance(payload, dict):
+        raise GeminiResponseError("Gemini response JSON must be an object.")
+
+    try:
+        return ScanResult.model_validate(_normalize_payload(payload))
+    except ValidationError as exc:
+        raise GeminiResponseError("Gemini response does not match ScanResult schema.") from exc
+
+
+def _response_text(response: Any) -> str:
+    try:
+        text = response.text
+    except ValueError as exc:
+        raise GeminiResponseError("Gemini response did not include text.") from exc
+
+    if not text or not text.strip():
+        raise GeminiResponseError("Gemini response was empty.")
+    return text.strip()
+
+
+def _generate_image_analysis(image_bytes: bytes, mime_type: str) -> ScanResult:
+    model_name = _configured_model_name()
+    try:
+        return _generate_image_analysis_with_model(model_name, image_bytes, mime_type)
+    except GeminiConfigurationError:
+        raise
+    except GeminiResponseError as exc:
+        logger.warning(
+            "Gemini model %s returned an unusable response: %s",
+            model_name,
+            exc,
+        )
+        raise
+    except Exception as exc:
+        logger.warning(
+            "Gemini model %s failed during image analysis",
+            model_name,
+            exc_info=True,
+        )
+        raise GeminiResponseError("Gemini API call failed.") from exc
+
+
+def _generate_image_analysis_with_model(
+    model_name: str,
+    image_bytes: bytes,
+    mime_type: str,
+) -> ScanResult:
+    model = _build_model(model_name)
+    response = model.generate_content(
+        [
+            PROMPT,
+            {
+                "mime_type": mime_type,
+                "data": image_bytes,
+            },
+        ],
+        generation_config=GenerationConfig(
+            temperature=0.1,
+            max_output_tokens=2048,
+            response_mime_type="application/json",
+            response_schema=SCAN_RESULT_RESPONSE_SCHEMA,
+        ),
+        request_options={"timeout": 40},
+    )
+
+    try:
+        payload = _extract_json(_response_text(response))
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise GeminiResponseError("Gemini response was not valid JSON.") from exc
+
+    return _validate_scan_result(payload)
+
+
+async def analyze_image(image_bytes: bytes, mime_type: str) -> ScanResult:
+    try:
+        return await asyncio.to_thread(_generate_image_analysis, image_bytes, mime_type)
+    except GeminiError:
+        raise
+    except Exception as exc:
+        logger.exception("Gemini image analysis failed")
+        raise GeminiResponseError("Gemini API call failed.") from exc
