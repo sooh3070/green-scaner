@@ -11,10 +11,12 @@ from google.generativeai.types import GenerationConfig
 from pydantic import ValidationError
 
 from app.schemas import CONDITION_VALUES, VERDICT_VALUES, ScanResult
+from app.services import rag
 
 logger = logging.getLogger(__name__)
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
+DEFAULT_GEMINI_MODEL = "gemini-3.5-flash"
 SCAN_RESULT_RESPONSE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -59,6 +61,30 @@ condition은 반드시 다음 중 하나이거나 null이어야 합니다:
 }
 """.strip()
 
+TEXT_PROMPT = """
+당신은 한국 분리배출 전문가입니다.
+사용자가 설명한 물품의 재질, 오염 상태, 라벨/테이프 부착 여부, 복합 재질 여부를 판단하세요.
+
+반드시 JSON 객체 하나만 응답하세요. 마크다운 코드블록이나 설명 문장은 넣지 마세요.
+응답 필드는 verdict, condition, action, reason 네 개를 모두 포함해야 합니다.
+
+verdict는 반드시 다음 중 하나여야 합니다:
+일반쓰레기, 플라스틱, 종이류, 유리, 캔, 비닐, 스티로폼, 음식물, 특수폐기물
+
+condition은 반드시 다음 중 하나이거나 null이어야 합니다:
+세척 필요, 라벨·테이프 제거 필요, 부품 분리 필요, null
+
+판단이 애매하면 재활용 가능성보다 실제 분리배출 기준과 오염 상태를 우선하세요.
+
+응답 형식:
+{
+  "verdict": "일반쓰레기",
+  "condition": null,
+  "action": "기름 오염이 심해 재활용이 어렵습니다. 종량제 봉투에 넣어 배출하세요.",
+  "reason": "기름이 많이 묻은 플라스틱 용기는 선별 과정에서 재활용 품질을 낮출 수 있습니다."
+}
+""".strip()
+
 
 class GeminiError(Exception):
     """Base exception for Gemini integration failures."""
@@ -87,9 +113,9 @@ def _load_api_key() -> str:
 def _configured_model_name() -> str:
     _load_env()
     model_name = os.getenv("GEMINI_MODEL")
-    if not model_name or not model_name.strip():
-        raise GeminiConfigurationError("GEMINI_MODEL is not configured.")
-    return model_name.strip()
+    if model_name and model_name.strip():
+        return model_name.strip()
+    return DEFAULT_GEMINI_MODEL
 
 
 def _build_model(model_name: str) -> genai.GenerativeModel:
@@ -246,8 +272,8 @@ def _generate_image_analysis_with_model(
     image_bytes: bytes,
     mime_type: str,
 ) -> ScanResult:
-    model = _build_model(model_name)
-    response = model.generate_content(
+    return _generate_scan_result(
+        model_name,
         [
             PROMPT,
             {
@@ -255,6 +281,48 @@ def _generate_image_analysis_with_model(
                 "data": image_bytes,
             },
         ],
+    )
+
+
+def _generate_text_analysis(message: str) -> ScanResult:
+    model_name = _configured_model_name()
+    try:
+        return _generate_text_analysis_with_model(model_name, message)
+    except GeminiConfigurationError:
+        raise
+    except GeminiResponseError as exc:
+        logger.warning(
+            "Gemini model %s returned an unusable text response: %s",
+            model_name,
+            exc,
+        )
+        raise
+    except Exception as exc:
+        logger.warning(
+            "Gemini model %s failed during text analysis",
+            model_name,
+            exc_info=True,
+        )
+        raise GeminiResponseError("Gemini API call failed.") from exc
+
+
+def _generate_text_analysis_with_model(model_name: str, message: str) -> ScanResult:
+    return _generate_scan_result(model_name, _build_text_contents(message))
+
+
+def _build_text_contents(message: str) -> list[str]:
+    context = rag.retrieve_context(message)
+    contents = [TEXT_PROMPT]
+    if context:
+        contents.append(f"참고 분리배출 기준:\n{context}")
+    contents.append(f"사용자 설명:\n{message}")
+    return contents
+
+
+def _generate_scan_result(model_name: str, contents: list[Any]) -> ScanResult:
+    model = _build_model(model_name)
+    response = model.generate_content(
+        contents,
         generation_config=GenerationConfig(
             temperature=0.1,
             max_output_tokens=2048,
@@ -279,4 +347,14 @@ async def analyze_image(image_bytes: bytes, mime_type: str) -> ScanResult:
         raise
     except Exception as exc:
         logger.exception("Gemini image analysis failed")
+        raise GeminiResponseError("Gemini API call failed.") from exc
+
+
+async def analyze_text(message: str) -> ScanResult:
+    try:
+        return await asyncio.to_thread(_generate_text_analysis, message)
+    except GeminiError:
+        raise
+    except Exception as exc:
+        logger.exception("Gemini text analysis failed")
         raise GeminiResponseError("Gemini API call failed.") from exc

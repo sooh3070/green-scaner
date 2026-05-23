@@ -58,7 +58,7 @@ async def scan_image(
     except gemini.GeminiConfigurationError:
         raise HTTPException(
             status_code=500,
-            detail="GEMINI_API_KEY 또는 GEMINI_MODEL이 설정되어 있지 않습니다.",
+            detail="GEMINI_API_KEY가 설정되어 있지 않습니다.",
         )
     except gemini.GeminiResponseError:
         raise HTTPException(status_code=500, detail="이미지를 분석할 수 없습니다.")
