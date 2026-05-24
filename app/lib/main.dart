@@ -33,26 +33,23 @@ class GreenScannerApp extends StatelessWidget {
   }
 }
 
-class _RootNav extends StatefulWidget {
+class _RootNav extends StatelessWidget {
   const _RootNav();
 
-  @override
-  State<_RootNav> createState() => _RootNavState();
-}
-
-class _RootNavState extends State<_RootNav> {
-  int _index = 0;
-
-  static const _pages = [HomePage(), ChatPage()];
-
   void _openCamera(BuildContext context) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const ScanPage()));
+    Navigator.push(
+        context, MaterialPageRoute(builder: (_) => const ScanPage()));
+  }
+
+  void _openChat(BuildContext context) {
+    Navigator.push(
+        context, MaterialPageRoute(builder: (_) => const ChatPage()));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _index, children: _pages),
+      body: const HomePage(),
       floatingActionButton: Container(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
@@ -82,15 +79,14 @@ class _RootNavState extends State<_RootNav> {
               _NavItem(
                 icon: Iconsax.home_2,
                 label: '홈',
-                selected: _index == 0,
-                onTap: () => setState(() => _index = 0),
+                selected: true,
+                onTap: () {},
               ),
               const SizedBox(width: 64),
               _NavItem(
                 icon: Iconsax.message,
                 label: '채팅',
-                selected: _index == 1,
-                onTap: () => setState(() => _index = 1),
+                onTap: () => _openChat(context),
               ),
             ],
           ),
@@ -104,14 +100,14 @@ class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.icon,
     required this.label,
-    required this.selected,
     required this.onTap,
+    this.selected = false,
   });
 
   final IconData icon;
   final String label;
-  final bool selected;
   final VoidCallback onTap;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
