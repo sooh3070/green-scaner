@@ -99,7 +99,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ScanPage()),
-            ),
+            ).then((_) => ref.invalidate(scanHistoryProvider)),
           ),
           _FeatureCard(
             icon: Iconsax.message,
