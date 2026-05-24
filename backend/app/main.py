@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+import os
+
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -13,6 +15,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+_API_KEY = os.getenv("API_KEY", "")
+
+
+@app.middleware("http")
+async def require_api_key(request: Request, call_next):
+    if request.url.path == "/" or not _API_KEY:
+        return await call_next(request)
+    if request.headers.get("X-API-Key") != _API_KEY:
+        return JSONResponse(status_code=401, content={"detail": "인증 실패"})
+    return await call_next(request)
 
 app.include_router(scan.router, prefix="/scan", tags=["scan"])
 app.include_router(chat.router, prefix="/chat", tags=["chat"])

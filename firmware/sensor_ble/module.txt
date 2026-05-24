@@ -1,0 +1,84 @@
+#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
+
+#define TRIG 4
+#define ECHO 18
+#define TRIGGER_DISTANCE 30.0  // 30cm 이내면 트리거
+
+#define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+
+BLEServer* pServer = nullptr;
+BLECharacteristic* pCharacteristic = nullptr;
+bool deviceConnected = false;
+bool triggered = false;
+unsigned long lastTriggerTime = 0;
+
+class MyServerCallbacks : public BLEServerCallbacks {
+  void onConnect(BLEServer* pServer) {
+    deviceConnected = true;
+    Serial.println("앱 연결됨!");
+  }
+  void onDisconnect(BLEServer* pServer) {
+    deviceConnected = false;
+    Serial.println("앱 연결 끊김 - 재광고 중...");
+    pServer->startAdvertising();
+  }
+};
+
+float getDistance() {
+  digitalWrite(TRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG, LOW);
+  long duration = pulseIn(ECHO, HIGH, 30000);
+  return duration * 0.034 / 2;
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(TRIG, OUTPUT);
+  pinMode(ECHO, INPUT);
+
+  BLEDevice::init("GreenScanner");
+  pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new MyServerCallbacks());
+
+  BLEService* pService = pServer->createService(SERVICE_UUID);
+  pCharacteristic = pService->createCharacteristic(
+    CHARACTERISTIC_UUID,
+    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
+  );
+  pCharacteristic->addDescriptor(new BLE2902());
+  pService->start();
+
+  BLEDevice::getAdvertising()->addServiceUUID(SERVICE_UUID);
+  BLEDevice::getAdvertising()->start();
+  Serial.println("BLE 준비 완료 - 앱 연결 대기 중...");
+}
+
+void loop() {
+  float distance = getDistance();
+  Serial.print("거리: ");
+  Serial.print(distance);
+  Serial.println(" cm");
+
+  unsigned long now = millis();
+
+  if (distance > 0 && distance < TRIGGER_DISTANCE && deviceConnected) {
+    if (!triggered || now - lastTriggerTime > 5000) {
+      pCharacteristic->setValue("TRIGGER");
+      pCharacteristic->notify();
+      Serial.println(">>> 트리거 전송!");
+      triggered = true;
+      lastTriggerTime = now;
+    }
+  } else if (distance >= TRIGGER_DISTANCE) {
+    triggered = false;
+  }
+
+  delay(300);
+}
