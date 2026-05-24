@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/models/scan_result.dart';
+import '../../core/services/scan_history_service.dart';
 
 class ScanNotifier extends AsyncNotifier<ScanResult?> {
   @override
@@ -16,7 +17,9 @@ class ScanNotifier extends AsyncNotifier<ScanResult?> {
         'file': await MultipartFile.fromFile(image.path),
       });
       final res = await dio.post('/scan/', data: formData);
-      return ScanResult.fromJson(res.data as Map<String, dynamic>);
+      final result = ScanResult.fromJson(res.data as Map<String, dynamic>);
+      await ScanHistoryService.add(result);
+      return result;
     });
   }
 

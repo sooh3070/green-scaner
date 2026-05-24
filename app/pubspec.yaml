@@ -52,6 +52,12 @@ dependencies:
   # 유틸
   flutter_dotenv: ^5.2.1
 
+  # 아이콘
+  iconsax: ^0.0.8
+
+  # 로컬 저장
+  shared_preferences: ^2.3.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
