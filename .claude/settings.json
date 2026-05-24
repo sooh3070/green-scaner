@@ -4,7 +4,8 @@
       "Bash(fvm --version)",
       "Bash(fvm releases *)",
       "Bash(fvm use *)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(fvm flutter *)"
     ]
   }
 }

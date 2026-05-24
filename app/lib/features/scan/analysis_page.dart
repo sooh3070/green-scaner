@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,20 +11,52 @@ const _nonRecyclable = {'일반쓰레기', '특수폐기물'};
 bool _isRecyclable(String verdict) => !_nonRecyclable.contains(verdict);
 
 class AnalysisPage extends ConsumerStatefulWidget {
-  const AnalysisPage({super.key, required this.imageFile});
+  const AnalysisPage({
+    super.key,
+    required this.imageFile,
+    this.fromKiosk = false,
+    this.countdownSeconds = 30,
+  });
   final File imageFile;
+  final bool fromKiosk;
+  final int countdownSeconds;
 
   @override
   ConsumerState<AnalysisPage> createState() => _AnalysisPageState();
 }
 
 class _AnalysisPageState extends ConsumerState<AnalysisPage> {
+  Timer? _timer;
+  int _remaining = 0;
+  bool _timerStarted = false;
+
   @override
   void initState() {
     super.initState();
+    _remaining = widget.countdownSeconds;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(scanProvider.notifier).scanImage(widget.imageFile);
     });
+  }
+
+  void _startCountdown() {
+    if (_timerStarted) return;
+    _timerStarted = true;
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) { t.cancel(); return; }
+      setState(() => _remaining--);
+      if (_remaining <= 0) {
+        t.cancel();
+        ref.read(scanProvider.notifier).reset();
+        Navigator.pop(context);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   void _retake() {
@@ -35,53 +68,59 @@ class _AnalysisPageState extends ConsumerState<AnalysisPage> {
   Widget build(BuildContext context) {
     final scanState = ref.watch(scanProvider);
 
+    if (widget.fromKiosk && !scanState.isLoading && scanState.value != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _startCountdown());
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6F8),
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () =>
-                      Navigator.popUntil(context, (route) => route.isFirst),
-                  icon: const Icon(Icons.home_rounded, size: 18),
-                  label: const Text('홈으로'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    foregroundColor: AppColors.primary1,
-                    side: const BorderSide(color: AppColors.primary1),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
+      bottomNavigationBar: widget.fromKiosk
+          ? _KioskCountdownBar(remaining: _remaining, total: widget.countdownSeconds)
+          : SafeArea(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () =>
+                            Navigator.popUntil(context, (route) => route.isFirst),
+                        icon: const Icon(Icons.home_rounded, size: 18),
+                        label: const Text('홈으로'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          foregroundColor: AppColors.primary1,
+                          side: const BorderSide(color: AppColors.primary1),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _retake,
+                        icon: const Icon(Icons.camera_alt_rounded,
+                            size: 18, color: Colors.white),
+                        label: const Text('다시 촬영'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          backgroundColor: AppColors.primary1,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _retake,
-                  icon: const Icon(Icons.camera_alt_rounded,
-                      size: 18, color: Colors.white),
-                  label: const Text('다시 촬영'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    backgroundColor: AppColors.primary1,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
       body: SafeArea(
         child: Column(
           children: [
@@ -412,6 +451,55 @@ class _InfoCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// 키오스크 카운트다운 바
+// ─────────────────────────────────────────────
+class _KioskCountdownBar extends StatelessWidget {
+  const _KioskCountdownBar({required this.remaining, required this.total});
+  final int remaining;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = remaining / total;
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.timer_rounded, size: 16, color: Colors.grey[400]),
+                const SizedBox(width: 6),
+                Text(
+                  '$remaining초 후 키오스크 화면으로 돌아갑니다',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 4,
+                backgroundColor: const Color(0xFFEEEEEE),
+                color: AppColors.primary1,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

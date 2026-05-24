@@ -7,7 +7,9 @@ import 'scan_provider.dart';
 import 'analysis_page.dart';
 
 class ScanPage extends ConsumerStatefulWidget {
-  const ScanPage({super.key});
+  const ScanPage({super.key, this.autoCapture = false});
+
+  final bool autoCapture;
 
   @override
   ConsumerState<ScanPage> createState() => _ScanPageState();
@@ -46,6 +48,11 @@ class _ScanPageState extends ConsumerState<ScanPage> {
         _controller = controller;
         _isCameraReady = true;
       });
+
+      if (widget.autoCapture) {
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (mounted) _capture();
+      }
     } catch (_) {}
   }
 
