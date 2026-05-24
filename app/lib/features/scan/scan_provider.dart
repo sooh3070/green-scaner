@@ -14,7 +14,7 @@ class ScanNotifier extends AsyncNotifier<ScanResult?> {
     state = await AsyncValue.guard(() async {
       final dio = ref.read(dioProvider);
       final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(image.path),
+        'image': await MultipartFile.fromFile(image.path),
       });
       final res = await dio.post('/scan/', data: formData);
       final result = ScanResult.fromJson(res.data as Map<String, dynamic>);

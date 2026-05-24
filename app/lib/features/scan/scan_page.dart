@@ -1,9 +1,10 @@
 import 'dart:io';
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
+import '../../core/theme/app_colors.dart';
 import 'scan_provider.dart';
-import 'widgets/result_card.dart';
+import 'analysis_page.dart';
 
 class ScanPage extends ConsumerStatefulWidget {
   const ScanPage({super.key});
@@ -13,120 +14,225 @@ class ScanPage extends ConsumerStatefulWidget {
 }
 
 class _ScanPageState extends ConsumerState<ScanPage> {
-  File? _image;
-  final _picker = ImagePicker();
+  CameraController? _controller;
+  bool _isCameraReady = false;
+  bool _isCapturing = false;
 
-  Future<void> _pickImage(ImageSource source) async {
-    final picked = await _picker.pickImage(source: source, imageQuality: 85);
-    if (picked == null) return;
-    setState(() => _image = File(picked.path));
-    ref.read(scanProvider.notifier).reset();
+  @override
+  void initState() {
+    super.initState();
+    _initCamera();
   }
 
-  Future<void> _scan() async {
-    if (_image == null) return;
-    await ref.read(scanProvider.notifier).scanImage(_image!);
+  Future<void> _initCamera() async {
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty || !mounted) return;
+
+      final controller = CameraController(
+        cameras.first,
+        ResolutionPreset.high,
+        enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.jpeg,
+      );
+
+      await controller.initialize();
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+
+      setState(() {
+        _controller = controller;
+        _isCameraReady = true;
+      });
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    ref.read(scanProvider.notifier).reset();
+    super.dispose();
+  }
+
+  Future<void> _capture() async {
+    if (!_isCameraReady || _isCapturing) return;
+    setState(() => _isCapturing = true);
+
+    try {
+      final xfile = await _controller!.takePicture();
+      if (!mounted) return;
+
+      ref.read(scanProvider.notifier).reset();
+
+      await Navigator.push(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (_, animation, _) =>
+              AnalysisPage(imageFile: File(xfile.path)),
+          transitionsBuilder: (_, animation, _, child) => FadeTransition(
+            opacity: animation,
+            child: child,
+          ),
+          transitionDuration: const Duration(milliseconds: 350),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('오류: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isCapturing = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final scanState = ref.watch(scanProvider);
+    final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('분리배출 판별')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _ImagePreview(image: _image, onPickImage: _pickImage),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _image == null || scanState.isLoading ? null : _scan,
-                icon: scanState.isLoading
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.search),
-                label: Text(scanState.isLoading ? '분석 중...' : '판별하기'),
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 카메라 프리뷰
+          if (_isCameraReady && _controller != null)
+            Positioned.fill(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _controller!.value.previewSize!.height,
+                  height: _controller!.value.previewSize!.width,
+                  child: CameraPreview(_controller!),
+                ),
               ),
-              const SizedBox(height: 24),
-              scanState.when(
-                data: (result) =>
-                    result != null ? ResultCard(result: result) : const SizedBox.shrink(),
-                loading: () => const SizedBox.shrink(),
-                error: (e, _) => _ErrorBanner(message: e.toString()),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+            )
+          else
+            const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
 
-class _ImagePreview extends StatelessWidget {
-  const _ImagePreview({required this.image, required this.onPickImage});
-
-  final File? image;
-  final void Function(ImageSource) onPickImage;
-
-  @override
-  Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 4 / 3,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: image != null
-            ? Image.file(image!, fit: BoxFit.cover)
-            : Container(
-                color: Colors.grey[200],
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.camera_alt_outlined, size: 48, color: Colors.grey),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        TextButton.icon(
-                          onPressed: () => onPickImage(ImageSource.camera),
-                          icon: const Icon(Icons.camera_alt),
-                          label: const Text('카메라'),
-                        ),
-                        TextButton.icon(
-                          onPressed: () => onPickImage(ImageSource.gallery),
-                          icon: const Icon(Icons.photo_library),
-                          label: const Text('갤러리'),
-                        ),
-                      ],
-                    ),
+          // 하단 그라데이션
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: size.height * 0.38,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.82),
                   ],
                 ),
               ),
+            ),
+          ),
+
+          // 상단 바
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const Expanded(
+                      child: Text(
+                        '카메라 스캔',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 48),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // 하단 컨트롤
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: _isCapturing
+                  ? const Padding(
+                      padding: EdgeInsets.only(bottom: 64),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(
+                              color: AppColors.primary1, strokeWidth: 3),
+                        ],
+                      ),
+                    )
+                  : _CaptureView(onCapture: _capture),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
+class _CaptureView extends StatelessWidget {
+  const _CaptureView({required this.onCapture});
 
-  final String message;
+  final VoidCallback onCapture;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.red[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.red[200]!),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 44),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '촬영 버튼을 눌러 분리배출을 확인하세요',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.75),
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 28),
+          GestureDetector(
+            onTap: onCapture,
+            child: Container(
+              width: 76,
+              height: 76,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 4),
+              ),
+              padding: const EdgeInsets.all(6),
+              child: Container(
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
-      child: Text(message, style: TextStyle(color: Colors.red[700])),
     );
   }
 }

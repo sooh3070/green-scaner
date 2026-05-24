@@ -87,7 +87,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             onStart: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ScanPage()),
-            ),
+            ).then((_) => ref.invalidate(scanHistoryProvider)),
           ),
           const SizedBox(height: 32),
           const _SectionTitle('주요 기능'),
