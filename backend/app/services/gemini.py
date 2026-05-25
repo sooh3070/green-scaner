@@ -42,6 +42,9 @@ SCAN_RESULT_RESPONSE_SCHEMA = {
             "enum": list(CONDITION_VALUES),
             "nullable": True,
         },
+        "pollution": {
+            "type": "integer",
+        },
         "action": {
             "type": "string",
         },
@@ -49,7 +52,13 @@ SCAN_RESULT_RESPONSE_SCHEMA = {
             "type": "string",
         },
     },
-    "required": ["verdict", "condition", "action", "reason"],
+    "required": [
+        "verdict",
+        "condition",
+        "pollution",
+        "action",
+        "reason",
+    ],
 }
 
 PROMPT = """
@@ -57,7 +66,7 @@ PROMPT = """
 이미지 속 물체의 재질, 오염 상태, 라벨/테이프 부착 여부, 복합 재질 여부를 판단하세요.
 
 반드시 JSON 객체 하나만 응답하세요. 마크다운 코드블록이나 설명 문장은 넣지 마세요.
-응답 필드는 verdict, condition, action, reason 네 개를 모두 포함해야 합니다.
+응답 필드는 verdict, condition, pollution, action, reason 다섯 개를 모두 포함해야 합니다.
 
 verdict는 반드시 다음 중 하나여야 합니다:
 알수없음, 일반쓰레기, 플라스틱, 종이류, 유리, 캔, 비닐, 스티로폼, 음식물, 특수폐기물
@@ -65,14 +74,18 @@ verdict는 반드시 다음 중 하나여야 합니다:
 condition은 반드시 다음 중 하나이거나 null이어야 합니다:
 세척 필요, 라벨·테이프 제거 필요, 부품 분리 필요, null
 
+pollution은 이미지 속 폐기물 표면의 음식물, 액체, 기름, 흙, 이물질 등 눈에 보이는 오염도를 0부터 100 사이의 정수 퍼센트로 추정하세요.
+오염이 거의 없으면 0~10, 가벼운 오염은 11~30, 세척이 필요한 오염은 31~70, 재활용이 어려울 정도의 심한 오염은 71~100으로 응답하세요.
+
 이미지에 분리배출할 폐기물이나 물품이 명확히 보이지 않으면 verdict는 반드시 "알수없음"으로 응답하세요.
 사람 얼굴, 신체, 배경, 화면, 문서처럼 폐기물로 판단할 수 없는 대상도 "알수없음"입니다.
-"알수없음"일 때 condition은 null이고, action은 폐기물만 다시 촬영해 달라는 안내로 작성하세요.
+"알수없음"일 때 condition은 null, pollution은 0이고, action은 폐기물만 다시 촬영해 달라는 안내로 작성하세요.
 
 응답 형식:
 {
   "verdict": "플라스틱",
   "condition": "세척 필요",
+  "pollution": 45,
   "action": "물로 3회 헹군 뒤 라벨을 제거하고 플라스틱 수거함에 배출하세요.",
   "reason": "PP 재질 용기로 보이며 표면에 기름 오염이 확인됩니다."
 }
@@ -83,7 +96,7 @@ TEXT_PROMPT = """
 사용자가 설명한 물품의 재질, 오염 상태, 라벨/테이프 부착 여부, 복합 재질 여부를 판단하세요.
 
 반드시 JSON 객체 하나만 응답하세요. 마크다운 코드블록이나 설명 문장은 넣지 마세요.
-응답 필드는 verdict, condition, action, reason 네 개를 모두 포함해야 합니다.
+응답 필드는 verdict, condition, pollution, action, reason 다섯 개를 모두 포함해야 합니다.
 
 verdict는 반드시 다음 중 하나여야 합니다:
 알수없음, 일반쓰레기, 플라스틱, 종이류, 유리, 캔, 비닐, 스티로폼, 음식물, 특수폐기물
@@ -91,8 +104,11 @@ verdict는 반드시 다음 중 하나여야 합니다:
 condition은 반드시 다음 중 하나이거나 null이어야 합니다:
 세척 필요, 라벨·테이프 제거 필요, 부품 분리 필요, null
 
+pollution은 사용자 설명에 드러난 음식물, 액체, 기름, 흙, 이물질 등 오염도를 0부터 100 사이의 정수 퍼센트로 추정하세요.
+오염이 거의 없으면 0~10, 가벼운 오염은 11~30, 세척이 필요한 오염은 31~70, 재활용이 어려울 정도의 심한 오염은 71~100으로 응답하세요.
+
 사용자 설명이 분리배출할 폐기물이나 물품을 가리키지 않으면 verdict는 반드시 "알수없음"으로 응답하세요.
-"알수없음"일 때 condition은 null이고, action은 폐기물을 다시 설명해 달라는 안내로 작성하세요.
+"알수없음"일 때 condition은 null, pollution은 0이고, action은 폐기물을 다시 설명해 달라는 안내로 작성하세요.
 
 판단이 애매하면 재활용 가능성보다 실제 분리배출 기준과 오염 상태를 우선하세요.
 
@@ -100,6 +116,7 @@ condition은 반드시 다음 중 하나이거나 null이어야 합니다:
 {
   "verdict": "일반쓰레기",
   "condition": null,
+  "pollution": 85,
   "action": "기름 오염이 심해 재활용이 어렵습니다. 종량제 봉투에 넣어 배출하세요.",
   "reason": "기름이 많이 묻은 플라스틱 용기는 선별 과정에서 재활용 품질을 낮출 수 있습니다."
 }
@@ -163,6 +180,9 @@ def _normalize_payload(payload: dict[str, Any]) -> dict[str, Any]:
     if "condition" in normalized:
         normalized["condition"] = _normalize_condition(normalized["condition"])
 
+    if "pollution" in normalized:
+        normalized["pollution"] = _normalize_pollution(normalized["pollution"])
+
     if "action" in normalized and isinstance(normalized["action"], str):
         normalized["action"] = normalized["action"].strip()
 
@@ -172,6 +192,7 @@ def _normalize_payload(payload: dict[str, Any]) -> dict[str, Any]:
     if _should_mark_unknown(normalized):
         normalized["verdict"] = "알수없음"
         normalized["condition"] = None
+        normalized["pollution"] = 0
 
     return normalized
 
@@ -250,6 +271,34 @@ def _normalize_condition(value: Any) -> Any:
         return "부품 분리 필요"
 
     return value.strip()
+
+
+def _normalize_pollution(value: Any) -> Any:
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, int):
+        return _clamp_percent(value)
+
+    if isinstance(value, float):
+        return _clamp_percent(round(value))
+
+    if not isinstance(value, str):
+        return value
+
+    stripped = value.strip()
+    if not stripped:
+        return value
+
+    compacted = stripped.replace("%", "").replace("퍼센트", "").strip()
+    try:
+        return _clamp_percent(round(float(compacted)))
+    except ValueError:
+        return value
+
+
+def _clamp_percent(value: int) -> int:
+    return min(max(value, 0), 100)
 
 
 def _compact_text(value: str) -> str:

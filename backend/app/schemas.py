@@ -45,6 +45,7 @@ Condition = Literal[
 class ScanResult(BaseModel):
     verdict: Verdict
     condition: Condition | None
+    pollution: int = Field(ge=0, le=100)
     action: str = Field(min_length=1)
     reason: str = Field(min_length=1)
 
