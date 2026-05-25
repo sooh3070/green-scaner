@@ -17,6 +17,19 @@ logger = logging.getLogger(__name__)
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_GEMINI_MODEL = "gemini-3.5-flash"
+UNKNOWN_RESULT_INDICATORS = (
+    "판단할수없",
+    "분류할수없",
+    "확인할수없",
+    "인식할수없",
+    "식별할수없",
+    "명확하지않",
+    "분리배출대상이아",
+    "폐기물이아",
+    "쓰레기가아",
+    "사람얼굴",
+    "신체",
+)
 SCAN_RESULT_RESPONSE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -47,10 +60,14 @@ PROMPT = """
 응답 필드는 verdict, condition, action, reason 네 개를 모두 포함해야 합니다.
 
 verdict는 반드시 다음 중 하나여야 합니다:
-일반쓰레기, 플라스틱, 종이류, 유리, 캔, 비닐, 스티로폼, 음식물, 특수폐기물
+알수없음, 일반쓰레기, 플라스틱, 종이류, 유리, 캔, 비닐, 스티로폼, 음식물, 특수폐기물
 
 condition은 반드시 다음 중 하나이거나 null이어야 합니다:
 세척 필요, 라벨·테이프 제거 필요, 부품 분리 필요, null
+
+이미지에 분리배출할 폐기물이나 물품이 명확히 보이지 않으면 verdict는 반드시 "알수없음"으로 응답하세요.
+사람 얼굴, 신체, 배경, 화면, 문서처럼 폐기물로 판단할 수 없는 대상도 "알수없음"입니다.
+"알수없음"일 때 condition은 null이고, action은 폐기물만 다시 촬영해 달라는 안내로 작성하세요.
 
 응답 형식:
 {
@@ -69,10 +86,13 @@ TEXT_PROMPT = """
 응답 필드는 verdict, condition, action, reason 네 개를 모두 포함해야 합니다.
 
 verdict는 반드시 다음 중 하나여야 합니다:
-일반쓰레기, 플라스틱, 종이류, 유리, 캔, 비닐, 스티로폼, 음식물, 특수폐기물
+알수없음, 일반쓰레기, 플라스틱, 종이류, 유리, 캔, 비닐, 스티로폼, 음식물, 특수폐기물
 
 condition은 반드시 다음 중 하나이거나 null이어야 합니다:
 세척 필요, 라벨·테이프 제거 필요, 부품 분리 필요, null
+
+사용자 설명이 분리배출할 폐기물이나 물품을 가리키지 않으면 verdict는 반드시 "알수없음"으로 응답하세요.
+"알수없음"일 때 condition은 null이고, action은 폐기물을 다시 설명해 달라는 안내로 작성하세요.
 
 판단이 애매하면 재활용 가능성보다 실제 분리배출 기준과 오염 상태를 우선하세요.
 
@@ -149,6 +169,10 @@ def _normalize_payload(payload: dict[str, Any]) -> dict[str, Any]:
     if "reason" in normalized and isinstance(normalized["reason"], str):
         normalized["reason"] = normalized["reason"].strip()
 
+    if _should_mark_unknown(normalized):
+        normalized["verdict"] = "알수없음"
+        normalized["condition"] = None
+
     return normalized
 
 
@@ -158,6 +182,22 @@ def _normalize_verdict(value: Any) -> Any:
 
     normalized = _compact_text(value)
     aliases = {
+        "알수없음": "알수없음",
+        "알수없다": "알수없음",
+        "알수없습니다": "알수없음",
+        "판단불가": "알수없음",
+        "판단할수없음": "알수없음",
+        "판단할수없다": "알수없음",
+        "판단할수없습니다": "알수없음",
+        "분류불가": "알수없음",
+        "확인불가": "알수없음",
+        "인식불가": "알수없음",
+        "대상아님": "알수없음",
+        "해당없음": "알수없음",
+        "쓰레기아님": "알수없음",
+        "폐기물아님": "알수없음",
+        "분리배출대상아님": "알수없음",
+        "unknown": "알수없음",
         "일반쓰레기": "일반쓰레기",
         "일반폐기물": "일반쓰레기",
         "종량제": "일반쓰레기",
@@ -222,6 +262,22 @@ def _compact_text(value: str) -> str:
         .replace("-", "")
         .replace("_", "")
     )
+
+
+def _should_mark_unknown(payload: dict[str, Any]) -> bool:
+    if payload.get("verdict") == "알수없음":
+        return True
+
+    if payload.get("verdict") != "일반쓰레기":
+        return False
+
+    text = " ".join(
+        str(payload.get(key, ""))
+        for key in ("action", "reason")
+        if payload.get(key) is not None
+    )
+    compacted_text = _compact_text(text)
+    return any(indicator in compacted_text for indicator in UNKNOWN_RESULT_INDICATORS)
 
 
 def _validate_scan_result(payload: dict[str, Any]) -> ScanResult:

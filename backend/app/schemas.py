@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 VERDICT_VALUES = (
+    "알수없음",
     "일반쓰레기",
     "플라스틱",
     "종이류",
@@ -22,6 +23,7 @@ CONDITION_VALUES = (
 )
 
 Verdict = Literal[
+    "알수없음",
     "일반쓰레기",
     "플라스틱",
     "종이류",
