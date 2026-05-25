@@ -2,15 +2,19 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
+import '../../core/services/auth_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/models/scan_history_entry.dart';
+import '../account/account_page.dart';
 import '../scan/scan_page.dart';
 import '../chat/chat_page.dart';
 import '../kiosk/kiosk_page.dart';
 import 'scan_history_provider.dart';
 
 class HomePage extends ConsumerStatefulWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, required this.onOpenStats});
+
+  final VoidCallback onOpenStats;
 
   @override
   ConsumerState<HomePage> createState() => _HomePageState();
@@ -67,10 +71,45 @@ class _HomePageState extends ConsumerState<HomePage> {
               actions: [
                 Padding(
                   padding: const EdgeInsets.only(right: 16),
-                  child: CircleAvatar(
-                    radius: 18,
-                    backgroundColor: Colors.grey[200],
-                    child: const Icon(Iconsax.user, size: 18, color: Colors.grey),
+                  child: StreamBuilder(
+                    stream: AuthService.userStream,
+                    initialData: AuthService.currentUser,
+                    builder: (context, snapshot) {
+                      final user = snapshot.data;
+                      final photoURL = user?.photoURL;
+
+                      return GestureDetector(
+                        onTap: () async {
+                          final result =
+                              await Navigator.push<AccountPageResult>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const AccountPage(),
+                                ),
+                              );
+
+                          if (!context.mounted) return;
+                          if (result == AccountPageResult.openStats) {
+                            widget.onOpenStats();
+                          }
+                        },
+                        behavior: HitTestBehavior.opaque,
+                        child: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: Colors.grey[200],
+                          backgroundImage: photoURL == null
+                              ? null
+                              : NetworkImage(photoURL),
+                          child: photoURL == null
+                              ? const Icon(
+                                  Iconsax.user,
+                                  size: 18,
+                                  color: Colors.grey,
+                                )
+                              : null,
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -80,7 +119,12 @@ class _HomePageState extends ConsumerState<HomePage> {
       ),
       body: ListView(
         controller: _scrollController,
-        padding: EdgeInsets.fromLTRB(20, topPadding + kToolbarHeight + 8, 20, 0),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          topPadding + kToolbarHeight + 8,
+          20,
+          0,
+        ),
         children: [
           const SizedBox(height: 8),
           _HeroBanner(
@@ -140,7 +184,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                         .toList(),
                   ),
             loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (error, stackTrace) => const SizedBox.shrink(),
           ),
           const SizedBox(height: 32),
         ],
@@ -195,7 +239,10 @@ class _HeroBanner extends StatelessWidget {
                 GestureDetector(
                   onTap: onStart,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(24),
@@ -212,7 +259,11 @@ class _HeroBanner extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 4),
-                        Icon(Icons.arrow_forward, size: 16, color: AppColors.primary2),
+                        Icon(
+                          Icons.arrow_forward,
+                          size: 16,
+                          color: AppColors.primary2,
+                        ),
                       ],
                     ),
                   ),
@@ -282,12 +333,18 @@ class _FeatureCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 15)),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text(subtitle,
-                      style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                  Text(
+                    subtitle,
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                  ),
                 ],
               ),
             ),
@@ -307,7 +364,8 @@ class _HistoryItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final date = entry.scannedAt;
-    final dateStr = '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
+    final dateStr =
+        '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -326,7 +384,11 @@ class _HistoryItem extends StatelessWidget {
               color: AppColors.primary1.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.recycling, color: AppColors.primary1, size: 20),
+            child: const Icon(
+              Icons.recycling,
+              color: AppColors.primary1,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -335,7 +397,10 @@ class _HistoryItem extends StatelessWidget {
               children: [
                 Text(
                   entry.result.verdict,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
