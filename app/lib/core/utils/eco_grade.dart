@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 
+// 재질별 CO₂ 절감량 (kg/개) — EPA WARM Model 기반
+// 출처: https://www.epa.gov/warm/documentation-chapters-greenhouse-gas-emission-and-energy-factors-used-waste-reduction-model-warm
 const co2PerVerdict = {
-  '플라스틱': 0.5,
-  '종이류':   0.3,
-  '유리':     0.4,
-  '캔':       0.6,
-  '비닐':     0.2,
-  '스티로폼': 0.3,
-  '음식물':   0.1,
-  '일반쓰레기': 0.05,
-  '특수폐기물': 0.8,
+  '플라스틱': 0.050,  // PET병 평균 25g × 2.0 kg CO₂/kg
+  '종이류':   0.080,  // 종이류 평균 150g × 0.54 kg CO₂/kg
+  '유리':     0.030,  // 유리병 평균 300g × 0.10 kg CO₂/kg
+  '캔':       0.095,  // 알루미늄 캔 평균 15g × 6.3 kg CO₂/kg
+  '비닐':     0.020,  // 비닐봉지 평균 40g × 0.50 kg CO₂/kg
+  '스티로폼': 0.040,  // EPS 평균 80g × 0.50 kg CO₂/kg
 };
 
 class EcoGrade {

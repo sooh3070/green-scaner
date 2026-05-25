@@ -153,6 +153,30 @@ Google Play 내부 테스트 링크 or PWA 설치
 
 ---
 
+## CO₂ 절감량 산출 근거
+
+통계 탭의 CO₂ 절감량은 재질별 LCA(전과정평가) 데이터를 기반으로 산출합니다.
+
+| 재질 | 항목당 절감량 | 산출 근거 |
+|------|-------------|----------|
+| 플라스틱 | 50 g CO₂ | PET병 평균 중량 25 g × 2.0 kg CO₂/kg |
+| 종이류   | 80 g CO₂ | 종이류 평균 중량 150 g × 0.54 kg CO₂/kg |
+| 유리     | 30 g CO₂ | 유리병 평균 중량 300 g × 0.10 kg CO₂/kg |
+| 캔       | 95 g CO₂ | 알루미늄 캔 평균 중량 15 g × 6.3 kg CO₂/kg |
+| 비닐     | 20 g CO₂ | 비닐봉지 평균 중량 40 g × 0.50 kg CO₂/kg |
+| 스티로폼 | 40 g CO₂ | EPS 평균 중량 80 g × 0.50 kg CO₂/kg |
+
+**출처**
+
+- EPA WARM (Waste Reduction Model) — 재질별 온실가스 배출 계수: https://www.epa.gov/warm/documentation-chapters-greenhouse-gas-emission-and-energy-factors-used-waste-reduction-model-warm
+- 한국환경공단 국가 LCI 데이터베이스: https://www.edp.or.kr
+- 온실가스종합정보센터 (환경부): https://www.gir.go.kr
+
+> 절감량은 해당 재질을 재활용했을 때 원자재 생산 대비 회피되는 온실가스량 기준입니다.  
+> 항목별 평균 중량은 국내 유통 제품 기준 추정치이며, 실제 제품에 따라 차이가 있을 수 있습니다.
+
+---
+
 ## 개발 배경
 
 > 해커톤 프로토타입 프로젝트  

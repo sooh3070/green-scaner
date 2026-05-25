@@ -43,6 +43,28 @@ class _AnimatedCounter extends StatelessWidget {
   }
 }
 
+class _AnimatedDecimalCounter extends StatelessWidget {
+  const _AnimatedDecimalCounter({
+    required this.value,
+    required this.style,
+    this.suffix = '',
+  });
+
+  final double value;
+  final TextStyle style;
+  final String suffix;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: value),
+      duration: const Duration(milliseconds: 1400),
+      curve: Curves.easeOutCubic,
+      builder: (_, v, _) => Text('${v.toStringAsFixed(1)}$suffix', style: style),
+    );
+  }
+}
+
 // ─── Page ─────────────────────────────────────
 
 class StatsPage extends StatelessWidget {
@@ -209,7 +231,10 @@ class _MyStatsCard extends StatelessWidget {
         const recyclableVerdicts = {'플라스틱', '종이류', '유리', '캔', '비닐', '스티로폼'};
         final recyclable = docs.where((d) => recyclableVerdicts.contains(d['verdict'])).length;
         final rate       = total == 0 ? 0 : (recyclable / total * 100).round();
-        final trees      = (recyclable / 50).floor();
+        final co2kg      = docs.fold<double>(0, (acc, d) {
+          final v = d['verdict'] as String? ?? '';
+          return acc + (co2PerVerdict[v] ?? 0);
+        });
 
         return Container(
           padding: const EdgeInsets.all(20),
@@ -302,11 +327,11 @@ class _MyStatsCard extends StatelessWidget {
                   ),
                   _Divider(),
                   Expanded(
-                    child: _StatTile(
-                      icon: Icons.park_outlined,
+                    child: _Co2StatTile(
+                      icon: Icons.co2_outlined,
                       iconColor: const Color(0xFF2E7D32),
-                      value: trees,
-                      label: '나무 살리기',
+                      co2kg: co2kg,
+                      label: 'CO₂ 절감',
                     ),
                   ),
                 ],
@@ -356,6 +381,45 @@ class _StatTile extends StatelessWidget {
             fontWeight: FontWeight.w900,
             color: Color(0xFF1A1A1A),
           ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: Color(0xFF9E9E9E)),
+        ),
+      ],
+    );
+  }
+}
+
+class _Co2StatTile extends StatelessWidget {
+  const _Co2StatTile({
+    required this.icon,
+    required this.iconColor,
+    required this.co2kg,
+    required this.label,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final double co2kg;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 20, color: iconColor),
+        const SizedBox(height: 6),
+        _AnimatedDecimalCounter(
+          value: co2kg,
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF1A1A1A),
+          ),
+          suffix: 'kg',
         ),
         const SizedBox(height: 3),
         Text(
