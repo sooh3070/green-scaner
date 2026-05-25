@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/firestore_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../account/account_page.dart';
 
 const _flatIconColor = Color(0xFF4B5563);
 
@@ -30,6 +31,7 @@ class StatsPage extends StatelessWidget {
       body: SafeArea(
         child: StreamBuilder<User?>(
           stream: AuthService.userStream,
+          initialData: AuthService.currentUser,
           builder: (context, authSnap) {
             final user = authSnap.data;
             return CustomScrollView(
@@ -52,7 +54,7 @@ class StatsPage extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            _AuthButton(user: user),
+                            _AccountButton(user: user),
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -81,10 +83,10 @@ class StatsPage extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-// 로그인 버튼
+// 계정 버튼
 // ─────────────────────────────────────────────
-class _AuthButton extends StatelessWidget {
-  const _AuthButton({required this.user});
+class _AccountButton extends StatelessWidget {
+  const _AccountButton({required this.user});
   final User? user;
 
   @override
@@ -92,8 +94,12 @@ class _AuthButton extends StatelessWidget {
     if (user == null) return const SizedBox.shrink();
     return GestureDetector(
       onTap: () async {
-        await AuthService.signOut();
+        await Navigator.push<AccountPageResult>(
+          context,
+          MaterialPageRoute(builder: (_) => const AccountPage()),
+        );
       },
+      behavior: HitTestBehavior.opaque,
       child: Row(
         children: [
           if (user!.photoURL != null)
