@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 스캔 기록: 본인만 읽기/쓰기
+    match /scans/{scanId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.uid;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
+    }
+    // 글로벌 통계: 누구나 읽기, 인증된 사용자만 쓰기
+    match /stats/global {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}

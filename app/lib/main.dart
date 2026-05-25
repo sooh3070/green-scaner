@@ -1,13 +1,17 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'core/theme/app_colors.dart';
-import 'features/chat/chat_page.dart';
 import 'features/home/home_page.dart';
 import 'features/scan/scan_page.dart';
+import 'features/stats/stats_page.dart';
+import 'firebase_options.dart';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await dotenv.load(fileName: 'assets/.env');
   runApp(const ProviderScope(child: GreenScannerApp()));
 }
@@ -33,30 +37,33 @@ class GreenScannerApp extends StatelessWidget {
   }
 }
 
-class _RootNav extends StatelessWidget {
+class _RootNav extends StatefulWidget {
   const _RootNav();
 
-  void _openCamera(BuildContext context) {
-    Navigator.push(
-        context, MaterialPageRoute(builder: (_) => const ScanPage()));
-  }
+  @override
+  State<_RootNav> createState() => _RootNavState();
+}
 
-  void _openChat(BuildContext context) {
-    Navigator.push(
-        context, MaterialPageRoute(builder: (_) => const ChatPage()));
+class _RootNavState extends State<_RootNav> {
+  int _tab = 0;
+
+  void _openCamera() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const ScanPage()));
   }
 
   @override
   Widget build(BuildContext context) {
+    final pages = [const HomePage(), const StatsPage()];
+
     return Scaffold(
-      body: const HomePage(),
+      body: pages[_tab],
       floatingActionButton: Container(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white, width: 4),
         ),
         child: FloatingActionButton(
-          onPressed: () => _openCamera(context),
+          onPressed: _openCamera,
           backgroundColor: AppColors.primary1,
           elevation: 2,
           shape: const CircleBorder(),
@@ -79,14 +86,15 @@ class _RootNav extends StatelessWidget {
               _NavItem(
                 icon: Iconsax.home_2,
                 label: '홈',
-                selected: true,
-                onTap: () {},
+                selected: _tab == 0,
+                onTap: () => setState(() => _tab = 0),
               ),
               const SizedBox(width: 64),
               _NavItem(
-                icon: Iconsax.message,
-                label: '채팅',
-                onTap: () => _openChat(context),
+                icon: Iconsax.chart,
+                label: '통계',
+                selected: _tab == 1,
+                onTap: () => setState(() => _tab = 1),
               ),
             ],
           ),

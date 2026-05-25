@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/models/scan_result.dart';
+import '../../core/services/firestore_service.dart';
 import '../../core/services/scan_history_service.dart';
 
 class ScanNotifier extends AsyncNotifier<ScanResult?> {
@@ -18,7 +19,10 @@ class ScanNotifier extends AsyncNotifier<ScanResult?> {
       });
       final res = await dio.post('/scan/', data: formData);
       final result = ScanResult.fromJson(res.data as Map<String, dynamic>);
-      await ScanHistoryService.add(result);
+      await Future.wait([
+        ScanHistoryService.add(result),
+        FirestoreService.saveScan(result),
+      ]);
       return result;
     });
   }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "506682564480",
+    "project_id": "green-scanner-2026",
+    "storage_bucket": "green-scanner-2026.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:506682564480:android:9391bfe6d6bf6dd68feb65",
+        "android_client_info": {
+          "package_name": "com.greenscaner.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCyAxnzXsyOF5TjuNlZZ58fGUC62PpQPpE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
