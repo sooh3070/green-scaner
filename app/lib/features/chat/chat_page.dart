@@ -5,7 +5,7 @@ import '../../core/models/chat_message.dart';
 import '../../core/models/scan_result.dart';
 import 'chat_provider.dart';
 
-const _nonRecyclable = {'일반쓰레기', '특수폐기물'};
+const _nonRecyclable = {'일반쓰레기', '특수폐기물', '알수없음'};
 
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key});
@@ -144,14 +144,9 @@ class _AiBubble extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 그린스캐너 아바타
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: AppColors.primary1,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: const Icon(Icons.recycling, color: Colors.white, size: 20),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.asset('assets/icon.png', width: 36, height: 36, fit: BoxFit.cover),
         ),
         const SizedBox(width: 10),
         Flexible(
@@ -254,7 +249,20 @@ class _AiResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final recyclable = !_nonRecyclable.contains(result.verdict);
-    final accent = recyclable ? AppColors.primary1 : const Color(0xFFE53935);
+    final hasCondition = result.condition != null;
+
+    final Color accent;
+    final String statusLabel;
+    if (!recyclable) {
+      accent = const Color(0xFFE53935);
+      statusLabel = '배출 불가능';
+    } else if (hasCondition) {
+      accent = const Color(0xFFFF8C00);
+      statusLabel = '조건부 배출';
+    } else {
+      accent = AppColors.primary1;
+      statusLabel = '배출 가능';
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -322,7 +330,7 @@ class _AiResultCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      recyclable ? '배출 가능' : '배출 불가능',
+                      statusLabel,
                       style: TextStyle(
                         color: accent,
                         fontSize: 13,

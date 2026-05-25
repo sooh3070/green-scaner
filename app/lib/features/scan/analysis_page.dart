@@ -6,7 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/models/scan_result.dart';
 import 'scan_provider.dart';
 
-const _nonRecyclable = {'일반쓰레기', '특수폐기물'};
+const _nonRecyclable = {'일반쓰레기', '특수폐기물', '알수없음'};
 
 bool _isRecyclable(String verdict) => !_nonRecyclable.contains(verdict);
 
@@ -227,7 +227,7 @@ class _LoadingView extends StatefulWidget {
 
 class _LoadingViewState extends State<_LoadingView> {
   static const _frameCount = 11;
-  static const _frameDuration = Duration(milliseconds: 80);
+  static const _frameDuration = Duration(milliseconds: 120);
 
   int _frame = 0;
   Timer? _timer;
