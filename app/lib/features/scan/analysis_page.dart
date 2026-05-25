@@ -226,11 +226,10 @@ class _LoadingView extends StatefulWidget {
 }
 
 class _LoadingViewState extends State<_LoadingView> {
-  // 핑퐁 시퀀스: 1→2→...→9→8→...→2→1→...
-  static const _frames = [1, 2, 3, 4, 5, 6, 7, 8, 9, 8, 7, 6, 5, 4, 3, 2];
+  static const _frameCount = 11;
   static const _frameDuration = Duration(milliseconds: 120);
 
-  int _step = 0;
+  int _frame = 0;
   Timer? _timer;
 
   String _framePath(int f) =>
@@ -239,7 +238,7 @@ class _LoadingViewState extends State<_LoadingView> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    for (var i = 1; i <= 9; i++) {
+    for (var i = 0; i < _frameCount; i++) {
       precacheImage(AssetImage(_framePath(i)), context);
     }
   }
@@ -249,7 +248,7 @@ class _LoadingViewState extends State<_LoadingView> {
     super.initState();
     _timer = Timer.periodic(_frameDuration, (_) {
       if (!mounted) return;
-      setState(() => _step = (_step + 1) % _frames.length);
+      setState(() => _frame = (_frame + 1) % _frameCount);
     });
   }
 
@@ -266,7 +265,7 @@ class _LoadingViewState extends State<_LoadingView> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Image.asset(_framePath(_frames[_step]), width: 120, height: 120),
+          Image.asset(_framePath(_frame), width: 120, height: 120),
           const SizedBox(height: 20),
           const Text(
             'AI가 분석 중이에요...',
