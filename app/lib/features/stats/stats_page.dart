@@ -5,17 +5,19 @@ import '../../core/services/auth_service.dart';
 import '../../core/services/firestore_service.dart';
 import '../../core/theme/app_colors.dart';
 
-const _verdictEmoji = {
-  '플라스틱': '🧴',
-  '종이류': '📦',
-  '유리': '🍶',
-  '캔': '🥫',
-  '비닐': '🛍',
-  '스티로폼': '📫',
-  '음식물': '🍚',
-  '일반쓰레기': '🗑',
-  '특수폐기물': '⚠️',
-  '알수없음': '❓',
+const _flatIconColor = Color(0xFF4B5563);
+
+const _verdictIcon = {
+  '플라스틱': Icons.local_drink_outlined,
+  '종이류': Icons.inventory_2_outlined,
+  '유리': Icons.wine_bar_outlined,
+  '캔': Icons.coffee_outlined,
+  '비닐': Icons.shopping_bag_outlined,
+  '스티로폼': Icons.inbox_outlined,
+  '음식물': Icons.restaurant_outlined,
+  '일반쓰레기': Icons.delete_outline_rounded,
+  '특수폐기물': Icons.warning_amber_rounded,
+  '알수없음': Icons.help_outline_rounded,
 };
 
 class StatsPage extends StatelessWidget {
@@ -58,7 +60,9 @@ class StatsPage extends StatelessWidget {
                           _MyStatsCard(user: user),
                           const SizedBox(height: 12),
                         ] else ...[
-                          _LoginPromptCard(onLogin: AuthService.signInWithGoogle),
+                          _LoginPromptCard(
+                            onLogin: AuthService.signInWithGoogle,
+                          ),
                           const SizedBox(height: 12),
                         ],
                         _GlobalStatsCard(),
@@ -129,26 +133,35 @@ class _LoginPromptCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const Text('🌿', style: TextStyle(fontSize: 32)),
+          const Icon(Icons.eco_outlined, size: 32, color: _flatIconColor),
           const SizedBox(height: 8),
           const Text(
             '로그인하면 내 분리배출 기여를\n확인할 수 있어요',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: Color(0xFF555555), height: 1.5),
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF555555),
+              height: 1.5,
+            ),
           ),
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: onLogin,
-              icon: const Icon(Icons.login_rounded, size: 18, color: Colors.white),
+              icon: const Icon(
+                Icons.login_rounded,
+                size: 18,
+                color: Colors.white,
+              ),
               label: const Text('Google로 로그인'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary1,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 elevation: 0,
               ),
             ),
@@ -193,7 +206,10 @@ class _MyStatsCard extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primary1,
                       borderRadius: BorderRadius.circular(6),
@@ -201,18 +217,20 @@ class _MyStatsCard extends StatelessWidget {
                     child: const Text(
                       '내 기여',
                       style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700),
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Text(
                     user.displayName?.split(' ').first ?? '사용자',
                     style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF555555)),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF555555),
+                    ),
                   ),
                 ],
               ),
@@ -221,7 +239,7 @@ class _MyStatsCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _StatBox(
-                      emoji: '♻️',
+                      icon: Icons.qr_code_scanner_rounded,
                       value: '$total',
                       label: '총 판별',
                     ),
@@ -229,7 +247,7 @@ class _MyStatsCard extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: _StatBox(
-                      emoji: '✅',
+                      icon: Icons.recycling_rounded,
                       value: '$recyclable',
                       label: '재활용 성공',
                       color: AppColors.primary1,
@@ -238,7 +256,7 @@ class _MyStatsCard extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: _StatBox(
-                      emoji: '🌳',
+                      icon: Icons.park_outlined,
                       value: '$trees',
                       label: '나무 살리기',
                       color: const Color(0xFF2E7D32),
@@ -272,8 +290,7 @@ class _GlobalStatsCard extends StatelessWidget {
             (data['verdictCounts'] as Map<String, dynamic>?) ?? {};
 
         final sorted = verdictCounts.entries.toList()
-          ..sort((a, b) =>
-              (b.value as num).compareTo(a.value as num));
+          ..sort((a, b) => (b.value as num).compareTo(a.value as num));
         final top5 = sorted.take(5).toList();
 
         return Container(
@@ -296,9 +313,10 @@ class _GlobalStatsCard extends StatelessWidget {
                 child: const Text(
                   '전체 통계',
                   style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700),
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -306,7 +324,7 @@ class _GlobalStatsCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _StatBox(
-                      emoji: '📊',
+                      icon: Icons.bar_chart_rounded,
                       value: '$totalScans',
                       label: '총 판별 수',
                     ),
@@ -314,7 +332,7 @@ class _GlobalStatsCard extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: _StatBox(
-                      emoji: '♻️',
+                      icon: Icons.recycling_rounded,
                       value: '$recyclableCount',
                       label: '재활용 처리',
                       color: AppColors.primary1,
@@ -323,7 +341,7 @@ class _GlobalStatsCard extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: _StatBox(
-                      emoji: '🌳',
+                      icon: Icons.park_outlined,
                       value: '${(recyclableCount / 50).floor()}',
                       label: '나무 살리기',
                       color: const Color(0xFF2E7D32),
@@ -338,18 +356,18 @@ class _GlobalStatsCard extends StatelessWidget {
                 const Text(
                   'TOP 5 쓰레기 종류',
                   style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF333333)),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF333333),
+                  ),
                 ),
                 const SizedBox(height: 10),
                 ...top5.map((e) {
-                  final maxVal =
-                      (top5.first.value as num).toDouble();
+                  final maxVal = (top5.first.value as num).toDouble();
                   final val = (e.value as num).toDouble();
                   final ratio = maxVal > 0 ? val / maxVal : 0.0;
                   return _VerdictBar(
-                    emoji: _verdictEmoji[e.key] ?? '📦',
+                    icon: _verdictIcon[e.key] ?? Icons.inventory_2_outlined,
                     label: e.key,
                     count: val.toInt(),
                     ratio: ratio,
@@ -369,12 +387,12 @@ class _GlobalStatsCard extends StatelessWidget {
 // ─────────────────────────────────────────────
 class _StatBox extends StatelessWidget {
   const _StatBox({
-    required this.emoji,
+    required this.icon,
     required this.value,
     required this.label,
     this.color = const Color(0xFF1A1A1A),
   });
-  final String emoji;
+  final IconData icon;
   final String value;
   final String label;
   final Color color;
@@ -389,12 +407,15 @@ class _StatBox extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 22)),
+          Icon(icon, size: 22, color: _flatIconColor),
           const SizedBox(height: 4),
           Text(
             value,
             style: TextStyle(
-                fontSize: 18, fontWeight: FontWeight.w800, color: color),
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
@@ -412,12 +433,12 @@ class _StatBox extends StatelessWidget {
 // ─────────────────────────────────────────────
 class _VerdictBar extends StatelessWidget {
   const _VerdictBar({
-    required this.emoji,
+    required this.icon,
     required this.label,
     required this.count,
     required this.ratio,
   });
-  final String emoji;
+  final IconData icon;
   final String label;
   final int count;
   final double ratio;
@@ -428,7 +449,10 @@ class _VerdictBar extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 16)),
+          SizedBox(
+            width: 18,
+            child: Icon(icon, size: 16, color: _flatIconColor),
+          ),
           const SizedBox(width: 8),
           SizedBox(
             width: 60,
@@ -454,9 +478,10 @@ class _VerdictBar extends StatelessWidget {
           Text(
             '$count',
             style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF555555)),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF555555),
+            ),
           ),
         ],
       ),
