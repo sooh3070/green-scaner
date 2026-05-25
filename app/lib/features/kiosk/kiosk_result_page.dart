@@ -3,7 +3,17 @@ import 'package:flutter/material.dart';
 import '../../core/models/scan_result.dart';
 import '../../core/theme/app_colors.dart';
 
-const _nonRecyclable = {'일반쓰레기', '특수폐기물'};
+const _nonRecyclable = {'일반쓰레기', '특수폐기물', '알수없음'};
+const _orange = Color(0xFFFF8C00);
+
+bool _isRecyclable(String verdict) => !_nonRecyclable.contains(verdict);
+
+String _conditionStatusLabel(String condition) {
+  if (condition.contains('세척')) return '세척 후 배출';
+  if (condition.contains('라벨') || condition.contains('테이프')) return '제거 후 배출';
+  if (condition.contains('분리') || condition.contains('부품')) return '분리 후 배출';
+  return '조건부 배출';
+}
 
 class KioskResultPage extends StatefulWidget {
   const KioskResultPage({
@@ -33,7 +43,6 @@ class _KioskResultPageState extends State<KioskResultPage>
       vsync: this,
       duration: Duration(seconds: widget.countdownSeconds),
     )..forward();
-
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) {
         t.cancel();
@@ -57,8 +66,21 @@ class _KioskResultPageState extends State<KioskResultPage>
   @override
   Widget build(BuildContext context) {
     final result = widget.result;
-    final recyclable = !_nonRecyclable.contains(result.verdict);
-    final accent = recyclable ? AppColors.primary1 : const Color(0xFFE53935);
+    final recyclable = _isRecyclable(result.verdict);
+    final hasCondition = result.condition != null;
+
+    final Color accent;
+    final String statusLabel;
+    if (!recyclable) {
+      accent = const Color(0xFFE53935);
+      statusLabel = '배출 불가능';
+    } else if (hasCondition) {
+      accent = _orange;
+      statusLabel = _conditionStatusLabel(result.condition!);
+    } else {
+      accent = AppColors.primary1;
+      statusLabel = '배출 가능';
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6F8),
@@ -85,7 +107,7 @@ class _KioskResultPageState extends State<KioskResultPage>
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    _buildHeaderCard(result, recyclable, accent),
+                    _buildHeaderCard(result, recyclable, accent, statusLabel),
                     const SizedBox(height: 12),
                     _buildInfoCard(
                       icon: Icons.recycling_rounded,
@@ -156,7 +178,12 @@ class _KioskResultPageState extends State<KioskResultPage>
     );
   }
 
-  Widget _buildHeaderCard(ScanResult result, bool recyclable, Color accent) {
+  Widget _buildHeaderCard(
+    ScanResult result,
+    bool recyclable,
+    Color accent,
+    String statusLabel,
+  ) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -183,12 +210,13 @@ class _KioskResultPageState extends State<KioskResultPage>
                     color: Colors.white,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               Text(
-                recyclable ? '배출 가능' : '배출 불가능',
+                statusLabel,
                 style: TextStyle(
                   color: accent,
                   fontSize: 13,
@@ -278,3 +306,4 @@ class _KioskResultPageState extends State<KioskResultPage>
     );
   }
 }
+

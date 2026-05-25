@@ -383,39 +383,10 @@ class _KioskPageState extends ConsumerState<KioskPage> {
           ),
         ),
 
-        // 분석 중 오버레이 (반투명 모달)
         if (_triggering)
-          Positioned.fill(
-            child: Container(
-              color: Colors.black45,
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 36, vertical: 28),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.78),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 3),
-                      SizedBox(height: 16),
-                      Text(
-                        'AI 분석 중...',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
+          const Positioned.fill(child: _AnalyzingOverlay()),
+
+
       ],
     );
   }
@@ -459,6 +430,78 @@ class _KioskPageState extends ConsumerState<KioskPage> {
               style: TextStyle(color: Colors.grey[500], height: 1.6),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AnalyzingOverlay extends StatefulWidget {
+  const _AnalyzingOverlay();
+
+  @override
+  State<_AnalyzingOverlay> createState() => _AnalyzingOverlayState();
+}
+
+class _AnalyzingOverlayState extends State<_AnalyzingOverlay> {
+  static const _frameCount = 11;
+  static const _frameDuration = Duration(milliseconds: 80);
+
+  int _frame = 0;
+  Timer? _timer;
+
+  String _framePath(int f) =>
+      'assets/chat_indicator/frame_${f.toString().padLeft(2, '0')}.png';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    for (var i = 0; i < _frameCount; i++) {
+      precacheImage(AssetImage(_framePath(i)), context);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(_frameDuration, (_) {
+      if (!mounted) return;
+      setState(() => _frame = (_frame + 1) % _frameCount);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black45,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.78),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(_framePath(_frame), width: 36, height: 36),
+              const SizedBox(width: 14),
+              const Text(
+                'AI 분석 중...',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
