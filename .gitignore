@@ -32,6 +32,7 @@ app/android/.gradle/
 app/android/local.properties
 app/android/captures/
 app/android/key.properties
+app/android/app/google-services.json
 *.jks
 *.keystore
 
@@ -39,6 +40,8 @@ app/android/key.properties
 app/ios/.symlinks/
 app/ios/Pods/
 app/ios/Flutter/flutter_export_environment.sh
+app/ios/Runner/GoogleService-Info.plist
+app/lib/firebase_options.dart
 
 # ==================== Docker ====================
 backend/.dockerignore
