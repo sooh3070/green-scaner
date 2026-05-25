@@ -1,5 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'firestore_service.dart';
+
+class NeedsReauthException implements Exception {}
 
 class AuthService {
   static final _auth = FirebaseAuth.instance;
@@ -22,5 +25,19 @@ class AuthService {
 
   static Future<void> signOut() async {
     await Future.wait([_auth.signOut(), _google.signOut()]);
+  }
+
+  static Future<void> deleteAccount() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    try {
+      await FirestoreService.deleteUserData(user.uid);
+      await _google.disconnect();
+      await user.delete();
+      await _auth.signOut();
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') throw NeedsReauthException();
+      rethrow;
+    }
   }
 }

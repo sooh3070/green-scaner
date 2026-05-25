@@ -53,4 +53,13 @@ class FirestoreService {
         .orderBy('timestamp', descending: true)
         .snapshots();
   }
+
+  static Future<void> deleteUserData(String uid) async {
+    final scans = await _db.collection('scans').where('uid', isEqualTo: uid).get();
+    final batch = _db.batch();
+    for (final doc in scans.docs) {
+      batch.delete(doc.reference);
+    }
+    if (scans.docs.isNotEmpty) await batch.commit();
+  }
 }

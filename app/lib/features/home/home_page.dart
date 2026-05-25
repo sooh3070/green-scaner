@@ -1,9 +1,13 @@
 import 'dart:ui';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/firestore_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/eco_grade_avatar.dart';
 import '../../core/models/scan_history_entry.dart';
 import '../account/account_page.dart';
 import '../scan/scan_page.dart';
@@ -71,45 +75,19 @@ class _HomePageState extends ConsumerState<HomePage> {
               actions: [
                 Padding(
                   padding: const EdgeInsets.only(right: 16),
-                  child: StreamBuilder(
-                    stream: AuthService.userStream,
-                    initialData: AuthService.currentUser,
-                    builder: (context, snapshot) {
-                      final user = snapshot.data;
-                      final photoURL = user?.photoURL;
-
-                      return GestureDetector(
-                        onTap: () async {
-                          final result =
-                              await Navigator.push<AccountPageResult>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const AccountPage(),
-                                ),
-                              );
-
-                          if (!context.mounted) return;
-                          if (result == AccountPageResult.openStats) {
-                            widget.onOpenStats();
-                          }
-                        },
-                        behavior: HitTestBehavior.opaque,
-                        child: CircleAvatar(
-                          radius: 18,
-                          backgroundColor: Colors.grey[200],
-                          backgroundImage: photoURL == null
-                              ? null
-                              : NetworkImage(photoURL),
-                          child: photoURL == null
-                              ? const Icon(
-                                  Iconsax.user,
-                                  size: 18,
-                                  color: Colors.grey,
-                                )
-                              : null,
-                        ),
+                  child: GestureDetector(
+                    onTap: () async {
+                      final result = await Navigator.push<AccountPageResult>(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AccountPage()),
                       );
+                      if (!context.mounted) return;
+                      if (result == AccountPageResult.openStats) {
+                        widget.onOpenStats();
+                      }
                     },
+                    behavior: HitTestBehavior.opaque,
+                    child: const EcoGradeAvatar(radius: 18),
                   ),
                 ),
               ],
@@ -162,6 +140,19 @@ class _HomePageState extends ConsumerState<HomePage> {
               context,
               MaterialPageRoute(builder: (_) => const KioskPage()),
             ),
+          ),
+          const SizedBox(height: 32),
+          const _SectionTitle('내 에코 활동'),
+          const SizedBox(height: 12),
+          _EcoActivitySection(
+            onOpenAccount: () async {
+              final result = await Navigator.push<AccountPageResult>(
+                context,
+                MaterialPageRoute(builder: (_) => const AccountPage()),
+              );
+              if (!context.mounted) return;
+              if (result == AccountPageResult.openStats) widget.onOpenStats();
+            },
           ),
           const SizedBox(height: 32),
           const _SectionTitle('최근 스캔 기록'),
@@ -422,6 +413,263 @@ class _HistoryItem extends StatelessWidget {
                 style: const TextStyle(color: AppColors.primary1, fontSize: 11),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Eco activity section ─────────────────────
+
+class _EcoActivitySection extends StatelessWidget {
+  const _EcoActivitySection({required this.onOpenAccount});
+
+  final VoidCallback onOpenAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: AuthService.userStream,
+      initialData: AuthService.currentUser,
+      builder: (context, snap) {
+        final user = snap.data;
+        if (user == null) return _EcoLockedCard();
+        return _EcoMiniCard(onOpenAccount: onOpenAccount);
+      },
+    );
+  }
+}
+
+// 로그인 상태: 실제 데이터 표시
+class _EcoMiniCard extends StatelessWidget {
+  const _EcoMiniCard({required this.onOpenAccount});
+
+  final VoidCallback onOpenAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirestoreService.myScansStream(),
+      builder: (context, snap) {
+        final docs     = snap.data?.docs ?? [];
+        final total    = docs.length;
+        final grade    = getEcoGrade(total);
+        final isMax    = grade.maxScans == -1;
+        final progress = isMax
+            ? 1.0
+            : (total - grade.minScans) / (grade.maxScans + 1 - grade.minScans);
+        final co2 = docs.fold<double>(
+          0,
+          (acc, d) => acc + (co2PerVerdict[d['verdict'] as String? ?? ''] ?? 0),
+        );
+        final gradientStart = Color.lerp(grade.color, Colors.white, 0.25)!;
+
+        return GestureDetector(
+          onTap: onOpenAccount,
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [gradientStart, grade.color],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: grade.color.withValues(alpha: 0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Text(grade.emoji, style: const TextStyle(fontSize: 32)),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          grade.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const Text(
+                          '에코 등급',
+                          style: TextStyle(color: Colors.white70, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${co2.toStringAsFixed(1)} kg',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const Text(
+                          'CO₂ 절감',
+                          style: TextStyle(color: Colors.white70, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 10),
+                    const Icon(Icons.chevron_right, color: Colors.white70, size: 20),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: progress.clamp(0.0, 1.0),
+                    minHeight: 7,
+                    backgroundColor: Colors.white24,
+                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '총 $total회 스캔',
+                      style: const TextStyle(color: Colors.white70, fontSize: 11),
+                    ),
+                    Text(
+                      isMax ? '최고 등급 달성! 🎉' : '다음 등급까지 ${grade.maxScans + 1 - total}회',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// 비로그인 상태: 잠금 프리뷰
+class _EcoLockedCard extends StatelessWidget {
+  const _EcoLockedCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFEEEEEE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('🌱🌳🌍', style: TextStyle(fontSize: 22)),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '에코 등급이 기다리고 있어요',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      '분리배출할수록 올라가는 나만의 환경 점수',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF9E9E9E)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: Color(0xFFF2F2F2)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _LockedBadge(label: 'CO₂ 절감량'),
+              const SizedBox(width: 8),
+              _LockedBadge(label: '에코 등급'),
+              const SizedBox(width: 8),
+              _LockedBadge(label: '재활용률'),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: AuthService.signInWithGoogle,
+              icon: const Icon(Icons.login_rounded, size: 16),
+              label: const Text('Google로 로그인하고 확인하기'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary1,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LockedBadge extends StatelessWidget {
+  const _LockedBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.primary1.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.lock_outline_rounded, size: 11, color: AppColors.primary1),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.primary1,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
