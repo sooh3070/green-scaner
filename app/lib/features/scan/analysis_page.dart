@@ -10,6 +10,15 @@ const _nonRecyclable = {'일반쓰레기', '특수폐기물'};
 
 bool _isRecyclable(String verdict) => !_nonRecyclable.contains(verdict);
 
+const _orange = Color(0xFFFF8C00);
+
+String _conditionStatusLabel(String condition) {
+  if (condition.contains('세척')) return '세척 후 배출';
+  if (condition.contains('라벨') || condition.contains('테이프')) return '제거 후 배출';
+  if (condition.contains('분리') || condition.contains('부품')) return '분리 후 배출';
+  return '조건부 배출';
+}
+
 class AnalysisPage extends ConsumerStatefulWidget {
   const AnalysisPage({
     super.key,
@@ -277,11 +286,24 @@ class _ResultContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final recyclable = _isRecyclable(result.verdict);
-    final accent = recyclable ? AppColors.primary1 : const Color(0xFFE53935);
+    final hasCondition = result.condition != null;
+
+    final Color accent;
+    final String statusLabel;
+    if (!recyclable) {
+      accent = const Color(0xFFE53935);
+      statusLabel = '배출 불가능';
+    } else if (hasCondition) {
+      accent = _orange;
+      statusLabel = _conditionStatusLabel(result.condition!);
+    } else {
+      accent = AppColors.primary1;
+      statusLabel = '배출 가능';
+    }
 
     return Column(
       children: [
-        _HeaderCard(result: result, recyclable: recyclable, accent: accent),
+        _HeaderCard(result: result, statusLabel: statusLabel, accent: accent),
         const SizedBox(height: 12),
         _InfoCard(
           icon: Icons.recycling_rounded,
@@ -307,11 +329,11 @@ class _ResultContent extends StatelessWidget {
 class _HeaderCard extends StatelessWidget {
   const _HeaderCard({
     required this.result,
-    required this.recyclable,
+    required this.statusLabel,
     required this.accent,
   });
   final ScanResult result;
-  final bool recyclable;
+  final String statusLabel;
   final Color accent;
 
   @override
@@ -349,7 +371,7 @@ class _HeaderCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                recyclable ? '배출 가능' : '배출 불가능',
+                statusLabel,
                 style: TextStyle(
                   color: accent,
                   fontSize: 13,
@@ -360,15 +382,23 @@ class _HeaderCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
 
-          // 판정 결과
-          Text(
-            result.verdict,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1A1A1A),
-              letterSpacing: -0.5,
-            ),
+          // 판정 결과 + 오염도 게이지
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  result.verdict,
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A),
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ),
+              _PollutionGauge(pollution: result.pollution),
+            ],
           ),
 
           // 처리 조건 칩
@@ -391,6 +421,63 @@ class _HeaderCard extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// 오염도 원형 게이지
+// ─────────────────────────────────────────────
+class _PollutionGauge extends StatelessWidget {
+  const _PollutionGauge({required this.pollution});
+  final int pollution;
+
+  Color get _gaugeColor {
+    if (pollution <= 30) return const Color(0xFF1DC862);
+    if (pollution <= 60) return const Color(0xFFFF8C00);
+    return const Color(0xFFE53935);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _gaugeColor;
+    return SizedBox(
+      width: 64,
+      height: 64,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          CircularProgressIndicator(
+            value: pollution / 100,
+            strokeWidth: 6,
+            backgroundColor: const Color(0xFFEEEEEE),
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+            strokeCap: StrokeCap.round,
+          ),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$pollution%',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+                Text(
+                  '오염도',
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: Colors.grey[500],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

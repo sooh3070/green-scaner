@@ -10,6 +10,7 @@ class ScanHistoryEntry {
   Map<String, dynamic> toJson() => {
         'verdict': result.verdict,
         'condition': result.condition,
+        'pollution': result.pollution,
         'action': result.action,
         'reason': result.reason,
         'scannedAt': scannedAt.toIso8601String(),
@@ -20,6 +21,7 @@ class ScanHistoryEntry {
         result: ScanResult(
           verdict: json['verdict'] as String,
           condition: json['condition'] as String?,
+          pollution: (json['pollution'] as num?)?.toInt() ?? 0,
           action: json['action'] as String,
           reason: json['reason'] as String,
         ),
