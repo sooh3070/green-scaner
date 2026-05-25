@@ -92,6 +92,7 @@ flutter:
     - assets/.env
     - assets/icon.png
     - assets/indicator/
+    - assets/chat_indicator/
 
 flutter_launcher_icons:
   android: true

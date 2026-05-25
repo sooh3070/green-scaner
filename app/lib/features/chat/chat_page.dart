@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
@@ -202,11 +203,48 @@ class _AiTextBubble extends StatelessWidget {
   }
 }
 
-class _LoadingBubble extends StatelessWidget {
+class _LoadingBubble extends StatefulWidget {
+  @override
+  State<_LoadingBubble> createState() => _LoadingBubbleState();
+}
+
+class _LoadingBubbleState extends State<_LoadingBubble> {
+  static const _frameCount = 11;
+  static const _frameDuration = Duration(milliseconds: 80);
+
+  int _frame = 0;
+  Timer? _timer;
+
+  String _framePath(int f) =>
+      'assets/chat_indicator/frame_${f.toString().padLeft(2, '0')}.png';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    for (var i = 0; i < _frameCount; i++) {
+      precacheImage(AssetImage(_framePath(i)), context);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(_frameDuration, (_) {
+      if (!mounted) return;
+      setState(() => _frame = (_frame + 1) % _frameCount);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: const BorderRadius.only(
@@ -220,15 +258,8 @@ class _LoadingBubble extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            width: 14,
-            height: 14,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: AppColors.primary1,
-            ),
-          ),
-          const SizedBox(width: 8),
+          Image.asset(_framePath(_frame), width: 28, height: 28),
+          const SizedBox(width: 10),
           Text(
             '분석 중...',
             style: TextStyle(fontSize: 13, color: Colors.grey[500]),
