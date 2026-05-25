@@ -216,21 +216,58 @@ class _ImageCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-// 로딩
+// 로딩 (프레임 애니메이션)
 // ─────────────────────────────────────────────
-class _LoadingView extends StatelessWidget {
+class _LoadingView extends StatefulWidget {
   const _LoadingView();
 
   @override
+  State<_LoadingView> createState() => _LoadingViewState();
+}
+
+class _LoadingViewState extends State<_LoadingView> {
+  static const _frameCount = 11;
+  static const _frameDuration = Duration(milliseconds: 80);
+
+  int _frame = 0;
+  Timer? _timer;
+
+  String _framePath(int f) =>
+      'assets/indicator/frame_${f.toString().padLeft(2, '0')}.png';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    for (var i = 0; i < _frameCount; i++) {
+      precacheImage(AssetImage(_framePath(i)), context);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(_frameDuration, (_) {
+      if (!mounted) return;
+      setState(() => _frame = (_frame + 1) % _frameCount);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 48),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircularProgressIndicator(color: AppColors.primary1, strokeWidth: 3),
-          SizedBox(height: 16),
-          Text(
+          Image.asset(_framePath(_frame), width: 120, height: 120),
+          const SizedBox(height: 20),
+          const Text(
             'AI가 분석 중이에요...',
             style: TextStyle(
               fontSize: 15,
