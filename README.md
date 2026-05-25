@@ -294,6 +294,7 @@ Google Play 내부 테스트 링크 or PWA 설치
 | 비닐 | 20 g CO₂ | 비닐봉지 평균 중량 40 g × 0.50 kg CO₂/kg |
 | 스티로폼 | 40 g CO₂ | EPS 평균 중량 80 g × 0.50 kg CO₂/kg |
 
+출처: https://www.epa.gov/climateleadership/ghg-emission-factors-hub
 ---
 
 ## 개발 배경
