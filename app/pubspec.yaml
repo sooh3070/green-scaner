@@ -58,6 +58,12 @@ dependencies:
   # 로컬 저장
   shared_preferences: ^2.3.3
 
+  # Firebase
+  firebase_core: ^3.13.1
+  firebase_auth: ^5.5.2
+  cloud_firestore: ^5.6.6
+  google_sign_in: ^6.2.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
