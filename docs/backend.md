@@ -10,7 +10,7 @@ backend/
 │   │   ├── scan.py          # POST /scan/ 엔드포인트
 │   │   └── chat.py          # POST /chat/ 엔드포인트
 │   └── services/
-│       ├── gemini.py        # Gemini 3.5 Flash 호출
+│       ├── gemini.py        # Gemini 3.1 Flash-Lite 호출
 │       └── rag.py           # RAG 검색 (분리배출 기준 KB)
 ├── knowledge_base/          # RAG에 사용할 분리배출 기준 텍스트
 ├── Dockerfile
@@ -25,7 +25,7 @@ backend/
 ### 1단계: Gemini 연동 (`services/gemini.py`)
 
 - `google-generativeai` SDK 사용
-- 모델: `gemini-3.5-flash`
+- 모델: `gemini-3.1-flash-lite`
 - 이미지(bytes) 또는 텍스트를 받아 ScanResult JSON 반환
 - 응답을 반드시 JSON으로 강제 (Structured Output 또는 프롬프트 지시)
 
@@ -100,7 +100,7 @@ gcloud run deploy green-scanner-api \
   --image gcr.io/PROJECT_ID/green-scanner-api \
   --platform managed \
   --region asia-northeast3 \
-  --set-env-vars GEMINI_API_KEY=your_key
+  --set-env-vars GEMINI_API_KEY=your_key,GEMINI_MODEL=gemini-3.1-flash-lite
 ```
 
 ---

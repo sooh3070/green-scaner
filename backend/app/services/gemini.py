@@ -16,7 +16,7 @@ from app.services import rag
 logger = logging.getLogger(__name__)
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-DEFAULT_GEMINI_MODEL = "gemini-3.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite"
 UNKNOWN_RESULT_INDICATORS = (
     "판단할수없",
     "분류할수없",
